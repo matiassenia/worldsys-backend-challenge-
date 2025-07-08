@@ -1,0 +1,13 @@
+# Node
+node_modules/
+.env
+dist/
+*.log
+*.tsbuildinfo
+
+# VSCode
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db

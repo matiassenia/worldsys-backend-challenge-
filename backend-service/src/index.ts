@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3000;
 //Middleware de health check
 app.use('/health', healthRouter);
 
-const FILE_PATH = '/app/input/CLIENTES_IN_0425.dat';
+const FILE_PATH = process.env.FILE_PATH!
 
 /**
  * Punto de entrada principal del servicio.

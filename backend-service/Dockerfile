@@ -15,6 +15,7 @@ COPY .env .env
 # Copiar el código fuente
 COPY ./src ./src
 
+
 # Comando para ejecutar el servicio con ts-node
 CMD [ "npx", "ts-node", "src/index.ts" ]
 

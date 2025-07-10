@@ -5,7 +5,6 @@ services:
     image: mcr.microsoft.com/mssql/server:2019-latest
     container_name: sqlserver
     env_file:
-      - fileName: 
       - .env
     environment:
       SA_PASSWORD: ${DB_PASSWORD}
@@ -37,8 +36,6 @@ services:
       - "3000:3000"
     environment:
       - DB_HOST=sqlserver
-      - DB_USER=sa
-      - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=clientes_db
       - DB_PORT=1433
     depends_on:
@@ -46,7 +43,8 @@ services:
       - db_init
     volumes:
       - .:/app
-      - ./data-generator/challenge/input:/app/input
+      - ./input:/app/input
+
 
 volumes:
   mssql_data:

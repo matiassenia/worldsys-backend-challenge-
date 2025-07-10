@@ -57,14 +57,23 @@ export async function insertBatch(batch: Cliente[]): Promise<void> {
   table.columns.add("NombreCompleto", sql.NVarChar(100), { nullable: false });
   table.columns.add("DNI", sql.BigInt, { nullable: false });
   table.columns.add("Estado", sql.VarChar(10), { nullable: false });
-  table.columns.add("FechaIngreso", sql.DateTime, { nullable: false });
+  table.columns.add("FechaIngreso", sql.Date, { nullable: false });
   table.columns.add("EsPEP", sql.Bit, { nullable: false });
   table.columns.add("EsSujetoObligado", sql.Bit, { nullable: true });
   table.columns.add("FechaCreacion", sql.DateTime, { nullable: false });
 
   for (const c of batch) {
+    if (
+      typeof c.nombreCompleto !== "string" ||
+      typeof c.estado !== "string" ||
+      isNaN(c.dni) ||
+      isNaN(c.fechaIngreso.getTime())
+    ) {
+      console.warn("❌ Datos inválidos omitido:", c);
+      continue; // Omitir registros con datos inválidos
+    }
     table.rows.add(
-      c.nombreCompleto,
+      c.nombreCompleto.substring(0, 100), // Limitar a 100 caracteres
       c.dni,
       c.estado,
       c.fechaIngreso,

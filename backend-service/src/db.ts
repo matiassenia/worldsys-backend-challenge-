@@ -5,32 +5,36 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const config: sql.config = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
-  database: process.env.DB_NAME,
+  user: process.env.DB_USER!,
+  password: process.env.DB_PASSWORD!,
+  server: process.env.DB_SERVER!,
+  database: process.env.DB_NAME!,
   options: {
-    encrypt: false, // Para Azure SQL será True
-    trustServerCertificate: true, // Para desarrollo local
+    encrypt: false,
+    trustServerCertificate: true,
   },
   port: Number(process.env.DB_PORT) || 1433,
 };
 
 let pool: sql.ConnectionPool;
 
+/**
+ * Conecta a SQL Server si aún no hay conexión
+ */
 export async function connectToDb() {
   if (!pool) {
     try {
-      pool = await sql.connectToDb(config);
-      console.log("Conexión a la base de datos establecida");
+      pool = await sql.connect(config); // 🛠️ Corrección: era connectToDb(config), ahora es sql.connect(config)
+      console.log("✅ Conexión a la base de datos establecida");
     } catch (error) {
-      console.error("Error al conectar a la base de datos:", error);
+      console.error("❌ Error al conectar a la base de datos:", error);
       throw error;
     }
   }
 }
 
-/** * Inserta un batch de clientes en la base de datos
+/**
+ * Inserta un batch de clientes usando inserción masiva
  */
 export async function insertBatch(batch: Cliente[]): Promise<void> {
   if (!pool) {
@@ -38,8 +42,8 @@ export async function insertBatch(batch: Cliente[]): Promise<void> {
   }
 
   const table = new sql.Table("Clientes");
-  table.create = false; // Crea la tabla si no existe
-  table.columns.add("nombreCompleto", sql.NVarChar(50), { nullable: false });
+  table.create = false;
+  table.columns.add("NombreCompleto", sql.NVarChar(100), { nullable: false });
   table.columns.add("DNI", sql.BigInt, { nullable: false });
   table.columns.add("Estado", sql.VarChar(10), { nullable: false });
   table.columns.add("FechaIngreso", sql.DateTime, { nullable: false });
@@ -62,9 +66,9 @@ export async function insertBatch(batch: Cliente[]): Promise<void> {
   try {
     const request = pool.request();
     await request.bulk(table);
-    console.log(`Batch de ${batch.length} clientes insertado correctamente`);
+    console.log(`📥 Batch de ${batch.length} clientes insertado correctamente`);
   } catch (error) {
-    console.error("Error al insertar batch en la base de datos:", error);
+    console.error("❌ Error al insertar batch en la base de datos:", error);
     throw error;
   }
 }

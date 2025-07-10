@@ -33,7 +33,7 @@ export async function connectWithRetry(retries = 5, delay = 5000) {
 
       await pool.request().query(`USE ${process.env.DB_NAME}`);
       console.log(`📚 Usando base de datos: ${process.env.DB_NAME}`);
-      
+
       return;
     } catch (error) {
       console.warn(`⏳ Intento ${i + 1} fallido. Reintentando en ${delay / 1000}s...`);
@@ -43,9 +43,6 @@ export async function connectWithRetry(retries = 5, delay = 5000) {
   console.error("❌ No se pudo conectar a la base de datos después de múltiples intentos");
   throw new Error("Fallo de conexión a la base de datos");
 }
-
-
-
 
 /**
  * Inserta un batch de clientes usando inserción masiva

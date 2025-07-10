@@ -1,9 +1,12 @@
+-- File: backend-service/sql/init.sql
+-- Crear base de datos y tabla si no existen
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'clientes_db')
 BEGIN
   CREATE DATABASE clientes_db;
 END
 GO
 
+--Crear tabla Clientes si no existe
 USE clientes_db;
 GO
 

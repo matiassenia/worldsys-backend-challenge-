@@ -1,34 +1,50 @@
-version: "3.8"
+version: "3.9"
 
 services:
-  db:
+  sqlserver:
     image: mcr.microsoft.com/mssql/server:2019-latest
     container_name: sqlserver
+    environment:
+      SA_PASSWORD: "Qnf]00JX)Lv~6N3"
+      ACCEPT_EULA: "Y"
     ports:
       - "1433:1433"
-    environment:
-      SA_PASSWORD: "YourStrong@Password123"
-      ACCEPT_EULA: "Y"
-    networks:
-      - app-net
+    volumes:
+      - mssql_data:/var/opt/mssql
+      - ./sql/init.sql:/init.sql
+
+  db_init:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: db_init
+    depends_on:
+      - sqlserver
+    entrypoint: >
+      bash -c "
+        echo 'Esperando a que SQL Server esté listo...' &&
+        sleep 20 &&
+        /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P 'Qnf]00JX)Lv~6N3' -i /init.sql
+      "
+    volumes:
+      - ./sql/init.sql:/init.sql
 
   app:
     build: .
     container_name: backend-service
-    depends_on:
-      - db
-    environment:
-      DB_USER: sa
-      DB_PASSWORD: YourStrong@Password123
-      DB_NAME: clientes_db
-      DB_SERVER: db
-      DB_PORT: 1433
-      PORT: 3000
     ports:
       - "3000:3000"
-    networks:
-      - app-net
+    environment:
+      - DB_HOST=sqlserver
+      - DB_USER=sa
+      - DB_PASSWORD=Qnf]00JX)Lv~6N3
+      - DB_NAME=clientes_db
+      - DB_PORT=1433
+    depends_on:
+      - sqlserver
+      - db_init
+    volumes:
+      - .:/app
+      - /c/Users/Usuario/Desktop/worldsysgroup-backend-challenge-file-ingestion/backend-challenge-file-ingestion/data-generator/challenge/input:/app/input
 
-networks:
-  app-net:
- 
+
+volumes:
+  mssql_data:

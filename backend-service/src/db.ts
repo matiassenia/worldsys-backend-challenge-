@@ -7,7 +7,7 @@ dotenv.config();
 const config: sql.config = {
   user: process.env.DB_USER!,
   password: process.env.DB_PASSWORD!,
-  server: process.env.DB_SERVER!,
+  server: process.env.DB_SERVER! || "localhost",
   database: process.env.DB_NAME!,
   options: {
     encrypt: false,
@@ -19,26 +19,40 @@ const config: sql.config = {
 let pool: sql.ConnectionPool;
 
 /**
- * Conecta a SQL Server si aún no hay conexión
+ * Intenta conectarse a la base de datos con reintentos
  */
-export async function connectToDb() {
-  if (!pool) {
+export async function connectWithRetry(retries = 5, delay = 5000) {
+  for (let i = 0; i < retries; i++) {
     try {
-      pool = await sql.connect(config); // 🛠️ Corrección: era connectToDb(config), ahora es sql.connect(config)
+      const initialConfig = {
+        ...config,
+        database: "master", // Conectar a la base de datos maestra para verificar la conexión
+      };
+      pool = await sql.connect(initialConfig);
       console.log("✅ Conexión a la base de datos establecida");
+
+      await pool.request().query(`USE ${process.env.DB_NAME}`);
+      console.log(`📚 Usando base de datos: ${process.env.DB_NAME}`);
+      
+      return;
     } catch (error) {
-      console.error("❌ Error al conectar a la base de datos:", error);
-      throw error;
+      console.warn(`⏳ Intento ${i + 1} fallido. Reintentando en ${delay / 1000}s...`);
+      await new Promise((res) => setTimeout(res, delay));
     }
   }
+  console.error("❌ No se pudo conectar a la base de datos después de múltiples intentos");
+  throw new Error("Fallo de conexión a la base de datos");
 }
+
+
+
 
 /**
  * Inserta un batch de clientes usando inserción masiva
  */
 export async function insertBatch(batch: Cliente[]): Promise<void> {
   if (!pool) {
-    await connectToDb();
+    await connectWithRetry();
   }
 
   const table = new sql.Table("Clientes");

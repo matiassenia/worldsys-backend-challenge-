@@ -1,6 +1,6 @@
 import express from 'express';
 import { processFile } from './processor';
-import { insertBatch, connectToDb } from './db';
+import { insertBatch, connectWithRetry } from './db';
 import dotenv from 'dotenv';
 import path from 'path';
 import { router as healthRouter } from './health';
@@ -12,11 +12,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use('/health', healthRouter);
 
-const FILE_PATH = path.resolve(__dirname, '../../data-generator/challenge/input/CLIENTES_IN_0425.dat');
+const FILE_PATH = '/app/input/CLIENTES_IN_0425.dat';
 
 async function main() {
   try {
-    await connectToDb();
+    await connectWithRetry(10, 5000); // Intentos y delay en ms
     console.log('Conexión a la base de datos establecida');
 
     await processFile(FILE_PATH, async (batch) => {

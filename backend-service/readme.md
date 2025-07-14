@@ -24,7 +24,7 @@ El objetivo principal es **leer, validar y almacenar eficientemente** los datos 
 ✅ Validación y descarte de líneas corruptas  
 ✅ Logs informativos y seguimiento de progreso  
 ✅ Reintentos automáticos si la base de datos aún no está lista
-
+✅ **Separación entre lectura y escritura mediante `queue` y `worker` para mayor concurrencia y rendimiento**
 ---
 
 ## 📦 Estructura del proyecto
@@ -34,7 +34,7 @@ backend-service/
 │
 ├── src/
 │   ├── index.ts               # Punto de entrada del servicio
-│   ├── processor.ts           # Lógica de procesamiento línea por línea
+│   ├── processor.ts           # Lógica de procesamiento 
 │   ├── db.ts                  # Conexión a la DB y bulk insert
 │   ├── health.ts              # Endpoint /health
 │   └── types.ts               # Interface Cliente
@@ -168,8 +168,8 @@ CREATE TABLE Clientes (
 ❌ Líneas inválidas descartadas: 3
 ✅ Procesamiento completado
 ```
-
-- Cada intento de conexión a la base de datos se reintenta automáticamente si aún no está disponible
+- **Ahora se utiliza una cola (`queue`) para almacenar los batches validados y un `worker` que los inserta asincrónicamente en la base.**
+- Esto desacopla la lectura e inserción y mejora el rendimiento general.
 - Se insertan los datos válidos en batches usando bulk insert
 
 ---
@@ -198,6 +198,8 @@ GET /health
 - Compatible con archivos de hasta 5 GB
 - Recursos limitados: `128Mi / 100m`
 - Reintentos automáticos y logs claros
+- **Procesamiento concurrente mediante `queue` + `worker`**
+- **Separación clara de responsabilidades entre lectura, validación y escritura**
 
 ---
 

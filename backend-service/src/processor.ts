@@ -1,5 +1,4 @@
-import fs, { read } from "fs";
-import path from "path";
+import fs from "fs";
 import readline from "readline";
 import { Cliente } from "./types";
 
@@ -17,84 +16,105 @@ export async function processFile(
   onBatch: (batch: Cliente[]) => Promise<void>,
   batchSize: number = 1000
 ): Promise<void> {
-  const inputStream = fs.createReadStream(filePath);
-  const rl = readline.createInterface({
-    input: inputStream,
+  const queue: Cliente[][] = [];
+  let readingCompleted = false;
+  let validCount = 0;
+  let invalidCount = 0;
+  let lineNumber = 0;
+  
+  // Worker asincrónico que procesa los batches en paralelo a la lectura
+  const worker = async () => {
+    while (!readingCompleted || queue.length > 0) {
+      const batch = queue.shift();
+      if (batch) {
+        try {
+          await onBatch(batch);
+        } catch (err) {
+          console.error("❌ Error al insertar batch en la base de datos:", err);
+        }
+      } else {
+        await new Promise((res) => setTimeout(res, 50));
+      }
+    }
+  };
+
+  const reader = readline.createInterface({
+    input: fs.createReadStream(filePath),
     crlfDelay: Infinity,
   });
 
-  const batch: Cliente[] = [];
-  let lineNumber = 0;
-  let validCount = 0;
-  let invalidCount = 0;
+  let currentBatch: Cliente[] = [];
 
-  for await (const line of rl) {
-    lineNumber++;
-    const fields = line.split("|");
-      
-    // Validación básica de cantidad de campos
-    if (fields.length < 7) {
-      console.warn(`Linea ${lineNumber} invalida (campos faltantes): ${line}`);
-      invalidCount++;
-      continue;
-    }
+  const parseFecha = (fechaStr: string): Date => {
+    const [mes, dia, anio] = fechaStr.split("/");
+    const fecha = new Date(`${anio}-${mes}-${dia}`);
+    return isNaN(fecha.getTime()) ? new Date("invalid") : fecha;
+  };
 
-    const [
-      nombre,
-      apellido,
-      dni,
-      estado,
-      fechaIngreso,
-      esPep,
-      esSujetoObligado,
-    ] = fields;
+  const parseBoolean = (value: string): boolean => value.trim().toLowerCase() === "true";
+  const parseOptionalBoolean = (value: string): boolean | null => {
+    return value.trim() === "" ? null : parseBoolean(value);
+  };  
 
-    //Construcción del objeto Cliente
-    const cliente: Cliente = {
-      nombreCompleto: `${nombre.trim()} ${apellido.trim()}`,
-      dni: parseInt(dni),
-      estado: estado.trim(),
-      fechaIngreso: parseFecha(fechaIngreso),
-      esPep: parseBoolean(esPep),
-      esSujetoObligado: parseOptionalBoolean(esSujetoObligado),
-      fechaCreacion: new Date(),
-    };
+  const processing = new Promise<void>((resolve) => {
+    reader.on("line", (line: string) => {
+      lineNumber++;
+      const fields = line.split("|");
 
-    //Validaciónes adicionales
-    const fechaValida = !isNaN(cliente.fechaIngreso.getTime());
-    const dniValido = !isNaN(cliente.dni) && cliente.dni < 99999999;
-    const estadoValido = ["activo", "inactivo"].includes(cliente.estado.toLowerCase());
+      if (fields.length < 7) {
+        console.warn(`Linea ${lineNumber} invalida (campos faltantes): ${line}`);
+        invalidCount++;
+        return;
 
-    // Si alguna validación falla, descartamos el registro
-
-    if (!fechaValida || !dniValido || !estadoValido) {
-      console.warn(`Linea ${lineNumber} inválida (DNI, fecha o estado): ${line}`);
-      invalidCount++;
-      continue;
-    }
-
-    batch.push(cliente);
-    validCount++;
-
-    // Si el batch alcanza el tamaño máximo, lo procesamos
-
-    if (batch.length === batchSize) {
-      try {
-        await onBatch(batch.splice(0, batchSize));
-      } catch (error) {
-        console.error(`Error procesando el batch: ${error}`);
       }
-    }
-  }
 
-  //Procesamiento de los últimos elementos
-  if (batch.length > 0) {
-    try {
-      await onBatch(batch);
-    } catch (error) {
-      console.error(`Error procesando el último batch: ${error}`);
-    }
-  }
+      // Desestructuración de campos
+      const [nombre, apellido, dni, estado, fechaIngreso, esPep, esSujetoObligado] = fields;
+
+      //Construcción del objeto Cliente
+      const cliente: Cliente = {
+        nombreCompleto: `${nombre.trim()} ${apellido.trim()}`,
+        dni: parseInt(dni),
+        estado: estado.trim(),
+        fechaIngreso: parseFecha(fechaIngreso),
+        esPep: parseBoolean(esPep),
+        esSujetoObligado: parseOptionalBoolean(esSujetoObligado),
+        fechaCreacion: new Date(),
+      };
+
+      //Validaciónes adicionales
+      const fechaValida = !isNaN(cliente.fechaIngreso.getTime());
+      const dniValido = !isNaN(cliente.dni) && cliente.dni < 99999999;
+      const estadoValido = ["activo", "inactivo"].includes(cliente.estado.toLowerCase());
+
+      // Si alguna validación falla, descartamos el registro
+      if (!fechaValida || !dniValido || !estadoValido) {
+        console.warn(`Linea ${lineNumber} inválida (DNI, fecha o estado): ${line}`);
+        invalidCount++;
+        return;
+      }
+
+      currentBatch.push(cliente);
+      validCount++;
+
+      // Si el batch alcanza el tamaño máximo, lo procesamos
+      if (currentBatch.length === batchSize) {
+        queue.push(currentBatch);
+        currentBatch = [];
+      }
+    });
+
+    reader.on("close", () => {
+      if (currentBatch.length > 0) {
+        queue.push(currentBatch);
+      }
+      readingCompleted = true;
+      resolve();
+    });
+  });
+
+  // Ejecutamos el worker y la lectura del archivo en paralelo
+  await Promise.all([worker(), processing]);
 
 // Log final del proceso
   console.log("✅ Procesamiento completado");
@@ -102,6 +122,9 @@ export async function processFile(
   console.log(`❌ Líneas inválidas descartadas: ${invalidCount}`);
 }
 
+
+
+//**Helper Functions */
 /**
  * Parsea fechas en formato MM/DD/YYYY. Devuelve un objeto Date.
  *
@@ -116,7 +139,6 @@ function parseFecha(fechaStr: string): Date {
   // Verificar si la fecha es válida
   return isNaN(fecha.getTime()) ? new Date("invalid") : fecha;
 }
-
 
 /**
  * Convierte un string a booleano.

@@ -71,7 +71,7 @@ cd worldsys-backend-challenge/backend-service
 
 ```env
 DB_USER=sa
-DB_PASSWORD=Qnf]00JX)Lv~6N3
+DB_PASSWORD=tu_password
 DB_NAME=clientes_db
 DB_SERVER=sqlserver
 DB_PORT=1433
